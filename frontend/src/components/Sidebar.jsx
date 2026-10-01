@@ -68,9 +68,14 @@ function Sidebar() {
 const data = await response.json();
 
 if (data.companyLogo) {
-    setCompanyLogo(
-       `https://hrms-qxao.onrender.com/${data.companyLogo}`
-    );
+    const logoUrl = /^https?:\/\//i.test(data.companyLogo)
+        ? data.companyLogo
+        : `https://hrms-qxao.onrender.com/${data.companyLogo.replace(
+              /^\/+/,
+              ""
+          )}`;
+
+    setCompanyLogo(logoUrl);
 }
             } catch (error) {
                 console.error(

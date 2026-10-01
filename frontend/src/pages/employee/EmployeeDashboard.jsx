@@ -371,13 +371,20 @@ function EmployeeDashboard() {
                     className="flex items-center gap-3 bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm hover:bg-gray-50 transition text-left"
                 >
 
-                    {profile?.profileImage ? (
-                        <img
-                            src={`${api.defaults.baseURL}/${profile.profileImage}`}
-                            alt={getEmployeeName()}
-                            className="w-11 h-11 rounded-full object-cover"
-                        />
-                    ) : (
+{profile?.profileImage ? (
+    <img
+        src={
+            /^https?:\/\//i.test(profile.profileImage)
+                ? profile.profileImage
+                : `${api.defaults.baseURL}/${profile.profileImage.replace(
+                      /^\/+/,
+                      ""
+                  )}`
+        }
+        alt={getEmployeeName()}
+        className="w-11 h-11 rounded-full object-cover"
+    />
+) : (
                         <div className="w-11 h-11 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-semibold">
                             {getInitials()}
                         </div>

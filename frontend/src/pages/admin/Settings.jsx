@@ -162,75 +162,82 @@ const Settings = () => {
         }));
     };
 
-    const handleSave = async () => {
-        if (!formData) {
-            return;
-        }
+const handleSave = async () => {
+    if (!formData) {
+        return;
+    }
 
-        try {
-            setSaving(true);
+    try {
+        setSaving(true);
 
-            /*
-             * Do not send logoPreview here.
-             * The actual logo upload will be handled separately
-             * through the upload endpoint.
-             */
-            const dataToSave = {
-                companyName: formData.companyName,
-                companyEmail: formData.companyEmail,
-                companyPhone: formData.companyPhone,
-                companyAddress: formData.companyAddress,
-                companyLogo: formData.companyLogo,
-
-                notificationSettings: {
-                    ...formData.notificationSettings
-                },
-
-                userPreferences: {
-                    ...formData.userPreferences
-                },
-
-                security: {
-                    ...formData.security
-                }
-            };
-
-            const response = await api.put(
-                "/settings",
-                dataToSave
-            );
-
-            const updatedSettings = createSafeSettings(
-                response.data?.settings
-            );
-
-            setSettings(updatedSettings);
-            setFormData(cloneSettings(updatedSettings));
-
-            /*
-             * Clear temporary logo preview after successful save.
-             */
-            if (logoPreview) {
-                URL.revokeObjectURL(logoPreview);
-                setLogoPreview("");
+        /*
+         * Do not send logoPreview here.
+         * The actual logo upload is handled separately
+         * through the upload endpoint.
+         */
+        const dataToSave = {
+            companyName: formData.companyName,
+            companyEmail: formData.companyEmail,
+            companyPhone: formData.companyPhone,
+            companyAddress: formData.companyAddress,
+            companyLogo: formData.companyLogo,
+            notificationSettings: {
+                ...formData.notificationSettings
+            },
+            userPreferences: {
+                ...formData.userPreferences
+            },
+            security: {
+                ...formData.security
             }
+        };
 
-            showToast(
-                "success",
-                "Settings saved successfully"
-            );
-        } catch (error) {
-            console.error("Save Settings Error:", error);
+        const response = await api.put(
+            "/settings",
+            dataToSave
+        );
 
-            showToast(
-                "error",
-                error.response?.data?.message ||
-                    "Failed to save settings"
-            );
-        } finally {
-            setSaving(false);
+        const updatedSettings = createSafeSettings(
+            response.data?.settings
+        );
+
+        setSettings(updatedSettings);
+        setFormData(cloneSettings(updatedSettings));
+
+        /*
+         * Clear temporary logo preview after successful save.
+         */
+        if (logoPreview) {
+            URL.revokeObjectURL(logoPreview);
+            setLogoPreview("");
         }
-    };
+
+        showToast(
+            "success",
+            "Settings saved successfully"
+        );
+
+        /*
+         * Reload the page after the settings are saved.
+         * This makes the Sidebar fetch and display
+         * the latest company logo immediately.
+         */
+        setTimeout(() => {
+            window.location.reload();
+        }, 500);
+
+    } catch (error) {
+        console.error("Save Settings Error:", error);
+
+        showToast(
+            "error",
+            error.response?.data?.message ||
+                "Failed to save settings"
+        );
+    } finally {
+        setSaving(false);
+    }
+};
 
     const handleReset = () => {
         if (!settings) {
@@ -481,15 +488,20 @@ const handleLogoChange = async (event) => {
               <div className="flex flex-col items-center">
                 <div className="w-[136px] h-[150px] border border-gray-200 rounded-xl flex items-center justify-center overflow-hidden bg-gray-50">
                   {logoSource ? (
-                    <img
-src={
-    formData.companyLogo
-        ? `${api.defaults.baseURL}/${formData.companyLogo}`
-        : ""
-}
-                      alt="Company Logo"
-                      className="w-full h-full object-contain p-4"
-                    />
+<img
+    src={
+        logoSource
+            ? /^https?:\/\//i.test(logoSource)
+                ? logoSource
+                : `${api.defaults.baseURL}/${logoSource.replace(
+                      /^\/+/,
+                      ""
+                  )}`
+            : ""
+    }
+    alt="Company Logo"
+    className="w-full h-full object-contain p-4"
+/>
                   ) : (
                     <i className="fas fa-building text-violet-500 text-5xl" />
                   )}
