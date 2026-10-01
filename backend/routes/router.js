@@ -191,7 +191,27 @@ router.get(
 router.put(
     "/profile",
     authenticateUser,
-    profileUpload.single("profileImage"),
+    (req, res, next) => {
+        profileUpload.single("profileImage")(req, res, (err) => {
+            if (err instanceof multer.MulterError) {
+                console.error("Profile Upload Multer Error:", err);
+
+                return res.status(400).json({
+                    message: err.message
+                });
+            }
+
+            if (err) {
+                console.error("Profile Upload Error:", err);
+
+                return res.status(500).json({
+                    message: err.message || "Profile image upload failed."
+                });
+            }
+
+            next();
+        });
+    },
     updateMyProfile
 );
 

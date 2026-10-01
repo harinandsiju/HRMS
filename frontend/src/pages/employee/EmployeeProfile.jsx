@@ -171,9 +171,21 @@ function EmployeeProfile() {
         ).toUpperCase();
     };
 
-    const getProfileImage = () => {
-    if (!profile?.profileImage) return null;
-    return `${api.defaults.baseURL}/${profile.profileImage}?t=${Date.now()}`;
+const getProfileImage = () => {
+    if (!profile?.profileImage) {
+        return null;
+    }
+
+    if (/^https?:\/\//i.test(profile.profileImage)) {
+        return `${profile.profileImage}${
+            profile.profileImage.includes("?") ? "&" : "?"
+        }t=${Date.now()}`;
+    }
+
+    return `${api.defaults.baseURL}/${profile.profileImage.replace(
+        /^\/+/,
+        ""
+    )}?t=${Date.now()}`;
 };
 
     const getSelectedImagePreview = () => {
