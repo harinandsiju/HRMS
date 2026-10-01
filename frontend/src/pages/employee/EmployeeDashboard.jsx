@@ -373,7 +373,7 @@ function EmployeeDashboard() {
 
                     {profile?.profileImage ? (
                         <img
-                            src={`http://localhost:5000/${profile.profileImage}`}
+                            src={`${api.defaults.baseURL}/${profile.profileImage}`}
                             alt={getEmployeeName()}
                             className="w-11 h-11 rounded-full object-cover"
                         />

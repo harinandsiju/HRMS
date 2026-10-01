@@ -1,6 +1,4 @@
 const Settings = require("../models/Settings");
-const fs = require("fs");
-const path = require("path");
 
 // Get Admin Settings
 const getSettings = async (req, res) => {
@@ -217,22 +215,8 @@ const uploadCompanyLogo = async (req, res) => {
             settings = new Settings();
         }
 
-        // Delete previous company logo if one exists
-        if (settings.companyLogo) {
-            const oldLogoPath = path.join(
-                __dirname,
-                "..",
-                settings.companyLogo
-            );
-
-            if (fs.existsSync(oldLogoPath)) {
-                fs.unlinkSync(oldLogoPath);
-            }
-        }
-
-        // Store only the file path in MongoDB
-        settings.companyLogo =
-            `uploads/company/${req.file.filename}`;
+        // Cloudinary returns the uploaded file URL in req.file.path
+        settings.companyLogo = req.file.path;
 
         await settings.save();
 
@@ -252,9 +236,10 @@ const uploadCompanyLogo = async (req, res) => {
     }
 };
 
+
 module.exports = {
     getSettings,
     getCompanyBranding,
     updateSettings,
-    uploadCompanyLogo   
+    uploadCompanyLogo
 };

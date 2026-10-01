@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
+
 import { useNavigate } from "react-router-dom";
+
 import { useAuth } from "../context/AuthContext";
+
 import api from "../api/axios";
 
 function Topbar() {
@@ -127,12 +130,27 @@ function Topbar() {
         }
     };
 
+    // =========================
+    // PROFILE IMAGE
+    // =========================
+
     const getProfileImage = () => {
         if (!profile?.profileImage) {
             return null;
         }
 
-        return `http://localhost:5000/${profile.profileImage}?t=${Date.now()}`;
+        // Cloudinary / external image URL
+        if (/^https?:\/\//i.test(profile.profileImage)) {
+            return `${profile.profileImage}${
+                profile.profileImage.includes("?") ? "&" : "?"
+            }t=${Date.now()}`;
+        }
+
+        // Older local/upload path
+        return `${api.defaults.baseURL}/${profile.profileImage.replace(
+            /^\/+/,
+            ""
+        )}?t=${Date.now()}`;
     };
 
     const profileImage = getProfileImage();
@@ -154,7 +172,6 @@ function Topbar() {
             <div className="flex-1 max-w-md">
                 <form onSubmit={handleSearch}>
                     <div className="relative">
-
                         <svg
                             className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
                             fill="none"
@@ -178,7 +195,6 @@ function Topbar() {
                             }
                             className="w-full pl-9 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                         />
-
                     </div>
                 </form>
             </div>
@@ -198,7 +214,6 @@ function Topbar() {
                     title="Open profile"
                 >
                     <div className="text-right hidden sm:block">
-
                         <p className="text-sm font-semibold text-gray-800">
                             {displayName}
                         </p>
@@ -206,11 +221,9 @@ function Topbar() {
                         <p className="text-xs text-gray-500">
                             {user?.role}
                         </p>
-
                     </div>
 
                     <div className="w-9 h-9 rounded-full bg-indigo-600 text-white flex items-center justify-center font-semibold overflow-hidden">
-
                         {profileImage ? (
                             <img
                                 src={profileImage}
@@ -221,12 +234,9 @@ function Topbar() {
                             profile?.firstName?.[0]?.toUpperCase() ||
                             user?.email?.[0]?.toUpperCase()
                         )}
-
                     </div>
                 </button>
-
             </div>
-
         </header>
     );
 }

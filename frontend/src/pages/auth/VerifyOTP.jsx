@@ -11,7 +11,7 @@ import {
 
 import PasswordRecoveryLayout from "./PasswordRecoveryLayout";
 
-const API_URL = "http://localhost:5000";
+const API_URL = "https://hrms-qxao.onrender.com";
 
 const VerifyOTP = () => {
     const navigate = useNavigate();

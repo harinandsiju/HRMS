@@ -1,51 +1,42 @@
 const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+const cloudinary = require("../config/cloudinary");
 
-const uploadDirectory = path.join(
-    __dirname,
-    "..",
-    "uploads",
-    "company"
-);
-
-// Create folder automatically if it doesn't exist
-if (!fs.existsSync(uploadDirectory)) {
-    fs.mkdirSync(uploadDirectory, {
-        recursive: true
-    });
-}
-
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, uploadDirectory);
-    },
-
-    filename: (req, file, cb) => {
-        const extension = path
-            .extname(file.originalname)
-            .toLowerCase();
-
-        const filename = `technova-logo-${Date.now()}${extension}`;
-
-        cb(null, filename);
+const storage = new CloudinaryStorage({
+    cloudinary,
+    params: {
+        folder: "hrms/company",
+        allowed_formats: [
+            "jpg",
+            "jpeg",
+            "png",
+            "webp"
+        ],
+        transformation: [
+            {
+                width: 500,
+                height: 500,
+                crop: "limit"
+            }
+        ]
     }
 });
 
-const fileFilter = (req, file, cb) => {
-    const allowedTypes = [
-        "image/jpeg",
-        "image/png",
-        "image/webp"
-    ];
+const allowedMimeTypes = [
+    "image/jpeg",
+    "image/png",
+    "image/webp"
+];
 
-    if (allowedTypes.includes(file.mimetype)) {
+const fileFilter = (req, file, cb) => {
+    if (allowedMimeTypes.includes(file.mimetype)) {
         cb(null, true);
     } else {
         cb(
             new Error(
                 "Only JPG, PNG and WEBP images are allowed."
-            )
+            ),
+            false
         );
     }
 };

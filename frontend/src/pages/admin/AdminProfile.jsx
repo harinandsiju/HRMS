@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+
 import api from "../../api/axios";
 
 function AdminProfile() {
@@ -20,6 +21,29 @@ function AdminProfile() {
     const [error, setError] = useState("");
 
     // ===============================
+    // PROFILE IMAGE URL
+    // ===============================
+
+    const getProfileImageUrl = (imagePath) => {
+        if (!imagePath) {
+            return null;
+        }
+
+        // Cloudinary / external URL
+        if (/^https?:\/\//i.test(imagePath)) {
+            return `${imagePath}${
+                imagePath.includes("?") ? "&" : "?"
+            }t=${Date.now()}`;
+        }
+
+        // Older local upload path
+        return `${api.defaults.baseURL}/${imagePath.replace(
+            /^\/+/,
+            ""
+        )}?t=${Date.now()}`;
+    };
+
+    // ===============================
     // FETCH ADMIN PROFILE
     // ===============================
 
@@ -38,10 +62,11 @@ function AdminProfile() {
                     phone: data.phone || ""
                 });
 
-if (data.profileImage) {
-  setPreviewImage(`http://localhost:5000/${data.profileImage}?t=${Date.now()}`);
-}
-
+                if (data.profileImage) {
+                    setPreviewImage(
+                        getProfileImageUrl(data.profileImage)
+                    );
+                }
             } catch (err) {
                 console.error("Profile fetch error:", err);
 
@@ -84,6 +109,7 @@ if (data.profileImage) {
         setProfileImage(file);
 
         const imageUrl = URL.createObjectURL(file);
+
         setPreviewImage(imageUrl);
     };
 
@@ -122,9 +148,11 @@ if (data.profileImage) {
             });
 
             if (updatedProfile.profileImage) {
-               setPreviewImage(
-                 `http://localhost:5000/${updatedProfile.profileImage}?t=${Date.now()}`,
-               );
+                setPreviewImage(
+                    getProfileImageUrl(
+                        updatedProfile.profileImage
+                    )
+                );
             }
 
             setProfileImage(null);
@@ -133,7 +161,6 @@ if (data.profileImage) {
                 response.data.message ||
                 "Profile updated successfully."
             );
-
         } catch (err) {
             console.error("Profile update error:", err);
 
@@ -233,7 +260,9 @@ if (data.profileImage) {
                                     />
                                 ) : (
                                     <span className="text-2xl font-bold text-white">
-                                        {formData.firstName?.charAt(0)?.toUpperCase() || "A"}
+                                        {formData.firstName
+                                            ?.charAt(0)
+                                            ?.toUpperCase() || "A"}
                                     </span>
                                 )}
 
@@ -261,7 +290,8 @@ if (data.profileImage) {
 
                         <div>
                             <h2 className="text-xl font-semibold text-white">
-                                {formData.firstName || formData.lastName
+                                {formData.firstName ||
+                                formData.lastName
                                     ? `${formData.firstName} ${formData.lastName}`.trim()
                                     : "Administrator"}
                             </h2>
@@ -401,13 +431,17 @@ if (data.profileImage) {
                 {/* Footer */}
 
                 <div className="border-t border-gray-100 px-6 py-4 flex justify-end">
+
                     <button
                         type="submit"
                         disabled={saving}
                         className="px-5 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
                     >
-                        {saving ? "Saving..." : "Save Changes"}
+                        {saving
+                            ? "Saving..."
+                            : "Save Changes"}
                     </button>
+
                 </div>
 
             </form>

@@ -482,11 +482,11 @@ const handleLogoChange = async (event) => {
                 <div className="w-[136px] h-[150px] border border-gray-200 rounded-xl flex items-center justify-center overflow-hidden bg-gray-50">
                   {logoSource ? (
                     <img
-                      src={
-                        formData.companyLogo
-                          ? `http://localhost:5000/${formData.companyLogo}`
-                          : ""
-                      }
+src={
+    formData.companyLogo
+        ? `${api.defaults.baseURL}/${formData.companyLogo}`
+        : ""
+}
                       alt="Company Logo"
                       className="w-full h-full object-contain p-4"
                     />

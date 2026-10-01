@@ -48,7 +48,7 @@ function Sidebar() {
                 if (!token) return;
 
                 const response = await fetch(
-                    "http://localhost:5000/company-branding",
+                    "https://hrms-qxao.onrender.com/company-branding",
                     {
                         method: "GET",
                         headers: {
@@ -69,7 +69,7 @@ const data = await response.json();
 
 if (data.companyLogo) {
     setCompanyLogo(
-        `http://localhost:5000/${data.companyLogo}`
+       `https://hrms-qxao.onrender.com/${data.companyLogo}`
     );
 }
             } catch (error) {

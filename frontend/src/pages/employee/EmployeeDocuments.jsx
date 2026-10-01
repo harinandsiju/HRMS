@@ -225,11 +225,15 @@ const EmployeeDocuments = () => {
         return "📄";
     };
 
-    const getFileUrl = (filePath) => {
-        if (!filePath) return "#";
+const getFileUrl = (filePath) => {
+    if (!filePath) return "#";
 
-        return `http://localhost:5000/${filePath}`;
-    };
+    if (/^https?:\/\//i.test(filePath)) {
+        return filePath;
+    }
+
+    return `${api.defaults.baseURL}/${filePath.replace(/^\/+/, "")}`;
+};
 
     return (
         <div className="employee-documents-page">

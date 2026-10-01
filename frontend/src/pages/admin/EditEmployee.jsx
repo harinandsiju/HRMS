@@ -109,14 +109,14 @@ function EditEmployee() {
             });
 
             // Load current profile image
-            if (data.profileImage) {
-                const imageUrl = data.profileImage.startsWith("http")
-                    ? data.profileImage
-                    : `http://localhost:5000/${data.profileImage.replace(/^\/+/, "")}`;
+if (data.profileImage) {
+    const imageUrl = data.profileImage.startsWith("http")
+        ? data.profileImage
+        : `${api.defaults.baseURL}/${data.profileImage.replace(/^\/+/, "")}`;
 
-                setCurrentProfileImage(imageUrl);
-                setProfilePreview(imageUrl);
-            }
+    setCurrentProfileImage(imageUrl);
+    setProfilePreview(imageUrl);
+}
 
         } catch (err) {
             console.error(err);

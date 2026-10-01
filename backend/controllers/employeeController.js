@@ -37,8 +37,9 @@ const createEmployee = async (req, res) => {
             relationship
         } = req.body;
 
+        // Cloudinary profile image URL
         const profileImage = req.file
-            ? `uploads/profile/${req.file.filename}`
+            ? req.file.path
             : null;
 
         // Check required fields
@@ -171,14 +172,11 @@ const createEmployee = async (req, res) => {
                 message: "Employee and User account created successfully.",
                 employee: updatedEmployee
             });
-
         } catch (userError) {
             // Remove employee if User creation fails
             await Employee.findByIdAndDelete(employee._id);
-
             throw userError;
         }
-
     } catch (error) {
         console.error("Create Employee Error:", error);
 
@@ -191,7 +189,6 @@ const createEmployee = async (req, res) => {
 
 const getAllEmployees = async (req, res) => {
     try {
-
         const {
             search,
             status,
@@ -315,29 +312,24 @@ const getAllEmployees = async (req, res) => {
             },
             employees
         });
-
     } catch (error) {
-
         console.error("Get Employees Error:", error);
 
         return res.status(500).json({
             message: "Internal Server Error"
         });
-
     }
 };
 
 
 const getEmployeeById = async (req, res) => {
     try {
-
         const { id } = req.params;
 
         const employee = await Employee.findOne({
             _id: id,
             isActive: true
-        })
-        .populate("departmentId", "name");
+        }).populate("departmentId", "name");
 
         if (!employee) {
             return res.status(404).json({
@@ -349,15 +341,12 @@ const getEmployeeById = async (req, res) => {
             message: "Employee fetched successfully.",
             employee
         });
-
     } catch (error) {
-
         console.error("Get Employee Error:", error);
 
         return res.status(500).json({
             message: "Internal Server Error"
         });
-
     }
 };
 
@@ -367,9 +356,7 @@ const getMyProfile = async (req, res) => {
         const userId = req.user.userId;
 
         // Find the logged-in User
-        const user = await User.findById(userId).select(
-            "-password"
-        );
+        const user = await User.findById(userId).select("-password");
 
         if (!user) {
             return res.status(404).json({
@@ -400,7 +387,6 @@ const getMyProfile = async (req, res) => {
         // =========================
         // EMPLOYEE PROFILE
         // =========================
-
         if (!user.employeeId) {
             return res.status(404).json({
                 message: "Employee profile is not linked to this user."
@@ -426,7 +412,6 @@ const getMyProfile = async (req, res) => {
             message: "Profile fetched successfully.",
             profile: employee
         });
-
     } catch (error) {
         console.error("Get My Profile Error:", error);
 
@@ -466,8 +451,9 @@ const updateMyProfile = async (req, res) => {
                 }
             });
 
+            // Cloudinary profile image URL
             if (req.file) {
-                user.profileImage = `uploads/profile/${req.file.filename}`;
+                user.profileImage = req.file.path;
             }
 
             const updatedUser = await user.save();
@@ -499,7 +485,6 @@ const updateMyProfile = async (req, res) => {
         // =========================
         // EMPLOYEE PROFILE
         // =========================
-
         if (!user.employeeId) {
             return res.status(404).json({
                 message: "Employee profile is not linked to this user."
@@ -545,8 +530,9 @@ const updateMyProfile = async (req, res) => {
             }
         });
 
+        // Cloudinary profile image URL
         if (req.file) {
-            employee.profileImage = `uploads/profile/${req.file.filename}`;
+            employee.profileImage = req.file.path;
         }
 
         const updatedEmployee = await employee.save();
@@ -564,7 +550,6 @@ const updateMyProfile = async (req, res) => {
             message: "Profile updated successfully.",
             profile: updatedEmployee
         });
-
     } catch (error) {
         console.error("Update My Profile Error:", error);
 
@@ -577,7 +562,6 @@ const updateMyProfile = async (req, res) => {
 
 const updateEmployee = async (req, res) => {
     try {
-
         const { id } = req.params;
 
         // Find the employee first
@@ -633,9 +617,9 @@ const updateEmployee = async (req, res) => {
             }
         });
 
-        // Update profile image if a new image was uploaded
+        // Cloudinary profile image URL
         if (req.file) {
-            employee.profileImage = `uploads/profile/${req.file.filename}`;
+            employee.profileImage = req.file.path;
         }
 
         const updatedEmployee = await employee.save();
@@ -644,22 +628,18 @@ const updateEmployee = async (req, res) => {
             message: "Employee updated successfully.",
             employee: updatedEmployee
         });
-
     } catch (error) {
-
         console.error("Update Employee Error:", error);
 
         return res.status(500).json({
             message: "Internal Server Error"
         });
-
     }
 };
 
 
 const deleteEmployee = async (req, res) => {
     try {
-
         const { id } = req.params;
 
         // Find the employee
@@ -684,15 +664,12 @@ const deleteEmployee = async (req, res) => {
         return res.status(200).json({
             message: "Employee deleted successfully."
         });
-
     } catch (error) {
-
         console.error("Delete Employee Error:", error);
 
         return res.status(500).json({
             message: "Internal Server Error"
         });
-
     }
 };
 

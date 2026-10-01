@@ -1,14 +1,12 @@
 const mongoose = require("mongoose");
-const fs = require("fs");
-const path = require("path");
-
 const logActivity = require("../helpers/activityLogger");
 const Document = require("../models/Document");
 const Employee = require("../models/Employee");
 const User = require("../models/User");
 
-
-// Upload Document (Admin - any employee, Employee - self only)
+// Upload Document
+// Admin - any employee
+// Employee - own documents only
 const uploadDocument = async (req, res) => {
     try {
         const { employeeId, documentType } = req.body;
@@ -20,23 +18,18 @@ const uploadDocument = async (req, res) => {
         }
 
         if (!employeeId) {
-            // Clean up uploaded file since request is invalid
-            fs.unlinkSync(req.file.path);
-
             return res.status(400).json({
                 message: "Employee ID is required"
             });
         }
 
         if (!mongoose.Types.ObjectId.isValid(employeeId)) {
-            fs.unlinkSync(req.file.path);
-
             return res.status(400).json({
                 message: "Invalid employee ID"
             });
         }
 
-        // If the requester is an Employee (not Admin), enforce self-upload only
+        // Employee can upload only for themselves
         if (req.user.role !== "Admin") {
             const user = await User.findById(req.user.userId);
 
@@ -45,15 +38,13 @@ const uploadDocument = async (req, res) => {
                 !user.employeeId ||
                 user.employeeId.toString() !== employeeId
             ) {
-                fs.unlinkSync(req.file.path);
-
                 return res.status(403).json({
-                    message: "Access Denied. You can only upload your own documents."
+                    message:
+                        "Access Denied. You can only upload your own documents."
                 });
             }
         }
 
-        // Check employee exists
         const employee = await Employee.findOne({
             _id: employeeId,
             isActive: true,
@@ -61,14 +52,11 @@ const uploadDocument = async (req, res) => {
         });
 
         if (!employee) {
-            fs.unlinkSync(req.file.path);
-
             return res.status(404).json({
                 message: "Active employee not found"
             });
         }
 
-        // Validate documentType if provided
         const validTypes = [
             "ID Proof",
             "Resume",
@@ -78,23 +66,19 @@ const uploadDocument = async (req, res) => {
         ];
 
         if (documentType && !validTypes.includes(documentType)) {
-            fs.unlinkSync(req.file.path);
-
             return res.status(400).json({
                 message: "Invalid document type"
             });
         }
 
-        // Store relative path (not absolute) for portability
-        const relativePath = path
-            .join("uploads/documents", req.file.filename)
-            .replace(/\\/g, "/");
+        // Cloudinary URL
+        const filePath = req.file.path;
 
         const document = await Document.create({
             employeeId,
             documentType: documentType || "Other",
             fileName: req.file.originalname,
-            filePath: relativePath,
+            filePath,
             fileSize: req.file.size,
             mimeType: req.file.mimetype,
             uploadedBy: req.user.userId
@@ -113,14 +97,8 @@ const uploadDocument = async (req, res) => {
             message: "Document uploaded successfully",
             document
         });
-
     } catch (error) {
         console.error("Upload Document Error:", error);
-
-        // Clean up file if something failed after upload
-        if (req.file && fs.existsSync(req.file.path)) {
-            fs.unlinkSync(req.file.path);
-        }
 
         return res.status(500).json({
             message: "Internal server error"
@@ -129,7 +107,7 @@ const uploadDocument = async (req, res) => {
 };
 
 
-// Get Documents by Employee (Admin)
+// Get Documents By Employee
 const getDocumentsByEmployee = async (req, res) => {
     try {
         const { employeeId } = req.params;
@@ -162,7 +140,6 @@ const getDocumentsByEmployee = async (req, res) => {
             count: documents.length,
             documents
         });
-
     } catch (error) {
         console.error("Get Documents By Employee Error:", error);
 
@@ -173,7 +150,7 @@ const getDocumentsByEmployee = async (req, res) => {
 };
 
 
-// Get My Documents (Employee - self only)
+// Get My Documents
 const getMyDocuments = async (req, res) => {
     try {
         const user = await User.findById(req.user.userId);
@@ -194,7 +171,6 @@ const getMyDocuments = async (req, res) => {
             count: documents.length,
             documents
         });
-
     } catch (error) {
         console.error("Get My Documents Error:", error);
 
@@ -205,7 +181,7 @@ const getMyDocuments = async (req, res) => {
 };
 
 
-// Soft Delete Document (Admin - any document, Employee - own document only)
+// Delete Document
 const deleteDocument = async (req, res) => {
     try {
         const { documentId } = req.params;
@@ -227,7 +203,7 @@ const deleteDocument = async (req, res) => {
             });
         }
 
-        // Employee can delete only their own document
+        // Employees can delete only their own documents
         if (req.user.role !== "Admin") {
             const user = await User.findById(req.user.userId);
 

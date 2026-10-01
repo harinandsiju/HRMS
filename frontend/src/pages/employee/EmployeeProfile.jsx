@@ -172,10 +172,9 @@ function EmployeeProfile() {
     };
 
     const getProfileImage = () => {
-        if (!profile?.profileImage) return null;
-
-        return `http://localhost:5000/${profile.profileImage}?t=${Date.now()}`;
-    };
+    if (!profile?.profileImage) return null;
+    return `${api.defaults.baseURL}/${profile.profileImage}?t=${Date.now()}`;
+};
 
     const getSelectedImagePreview = () => {
         if (!selectedImage) return null;
