@@ -12,8 +12,8 @@ const User = require("../models/User");
 
 const generateReportPDF = require("../helpers/pdfGenerator");
 
-
 // ---------- DASHBOARD CARDS ----------
+
 const getDashboardSummary = async (req, res) => {
     try {
         const now = new Date();
@@ -35,16 +35,20 @@ const getDashboardSummary = async (req, res) => {
         // Attendance rate this month
         const attendanceThisMonth = await Attendance.find({
             isActive: true,
-            date: { $gte: startOfMonth, $lt: startOfNextMonth }
+            date: {
+                $gte: startOfMonth,
+                $lt: startOfNextMonth
+            }
         });
 
         const presentCount = attendanceThisMonth.filter(
             (a) => a.status === "Present"
         ).length;
 
-        const attendanceRate = attendanceThisMonth.length > 0
-            ? ((presentCount / attendanceThisMonth.length) * 100).toFixed(1)
-            : "0.0";
+        const attendanceRate =
+            attendanceThisMonth.length > 0
+                ? ((presentCount / attendanceThisMonth.length) * 100).toFixed(1)
+                : "0.0";
 
         // Pending leave requests
         const pendingLeaveCount = await Leave.countDocuments({
@@ -70,9 +74,10 @@ const getDashboardSummary = async (req, res) => {
             }
         ]);
 
-        const payrollProcessed = paidPayrollThisMonth.length > 0
-            ? paidPayrollThisMonth[0].total
-            : 0;
+        const payrollProcessed =
+            paidPayrollThisMonth.length > 0
+                ? paidPayrollThisMonth[0].total
+                : 0;
 
         return res.status(200).json({
             message: "Dashboard summary fetched successfully",
@@ -81,7 +86,6 @@ const getDashboardSummary = async (req, res) => {
             pendingLeaveRequests: pendingLeaveCount,
             payrollProcessedThisMonth: payrollProcessed
         });
-
     } catch (error) {
         console.error("Get Dashboard Summary Error:", error);
 
@@ -91,8 +95,8 @@ const getDashboardSummary = async (req, res) => {
     }
 };
 
-
 // ---------- ATTENDANCE OVERVIEW CHART ----------
+
 const getAttendanceOverview = async (req, res) => {
     try {
         const { startDate, endDate } = req.query;
@@ -112,43 +116,121 @@ const getAttendanceOverview = async (req, res) => {
             });
         }
 
+        if (start > end) {
+            return res.status(400).json({
+                message: "startDate cannot be after endDate"
+            });
+        }
+
+        // Include the complete end date
         end.setUTCDate(end.getUTCDate() + 1);
+
+        // Get total active employees.
+        // This is the denominator for the attendance percentage.
+        const activeEmployees = await Employee.find({
+            isActive: true,
+            isDeleted: false
+        }).select("_id");
+
+        const activeEmployeeIds = activeEmployees.map(
+            (employee) => employee._id
+        );
+
+        const totalActiveEmployees = activeEmployeeIds.length;
+
+        console.log("TOTAL ACTIVE EMPLOYEES:", totalActiveEmployees);
+console.log("ACTIVE EMPLOYEE IDS:", activeEmployeeIds);
+
+        // If there are no active employees, return zero attendance.
+        if (totalActiveEmployees === 0) {
+            return res.status(200).json({
+                message: "Attendance overview fetched successfully",
+                overview: []
+            });
+        }
+
+        /*
+         * Attendance calculation:
+         *
+         * Present active employees
+         * ------------------------- × 100
+         * Total active employees
+         *
+         * Example:
+         * 3 Present / 10 Active Employees × 100 = 30%
+         *
+         * We first group by date + employeeId so that one employee
+         * cannot accidentally be counted more than once on the same day.
+         */
 
         const records = await Attendance.aggregate([
             {
                 $match: {
                     isActive: true,
-                    date: { $gte: start, $lt: end }
+                    date: {
+                        $gte: start,
+                        $lt: end
+                    },
+                    employeeId: {
+                        $in: activeEmployeeIds
+                    },
+                    status: "Present"
                 }
             },
+
+            // Count each employee only once per day
             {
                 $group: {
                     _id: {
-                        $dateToString: { format: "%Y-%m-%d", date: "$date" }
-                    },
-                    total: { $sum: 1 },
-                    present: {
-                        $sum: {
-                            $cond: [{ $eq: ["$status", "Present"] }, 1, 0]
-                        }
+                        date: {
+                            $dateToString: {
+                                format: "%Y-%m-%d",
+                                date: "$date"
+                            }
+                        },
+                        employeeId: "$employeeId"
                     }
                 }
             },
-            { $sort: { _id: 1 } }
+
+            // Count unique present employees for each date
+            {
+                $group: {
+                    _id: "$_id.date",
+                    presentEmployees: {
+                        $sum: 1
+                    }
+                }
+            },
+
+            {
+                $sort: {
+                    _id: 1
+                }
+            }
         ]);
 
-        const overview = records.map((r) => ({
-            date: r._id,
-            attendanceRate: r.total > 0
-                ? Number(((r.present / r.total) * 100).toFixed(1))
-                : 0
+        console.log("ATTENDANCE RECORDS:", records);
+
+        const overview = records.map((record) => ({
+            date: record._id,
+
+            attendanceRate:
+                totalActiveEmployees > 0
+                    ? Number(
+                          (
+                              (record.presentEmployees /
+                                  totalActiveEmployees) *
+                              100
+                          ).toFixed(1)
+                      )
+                    : 0
         }));
 
         return res.status(200).json({
             message: "Attendance overview fetched successfully",
             overview
         });
-
     } catch (error) {
         console.error("Get Attendance Overview Error:", error);
 
@@ -158,8 +240,8 @@ const getAttendanceOverview = async (req, res) => {
     }
 };
 
-
 // ---------- DEPARTMENT DISTRIBUTION ----------
+
 const getDepartmentDistribution = async (req, res) => {
     try {
         const distribution = await Employee.aggregate([
@@ -189,25 +271,38 @@ const getDepartmentDistribution = async (req, res) => {
                     departmentId: "$_id",
                     departmentName: {
                         $ifNull: [
-                            { $arrayElemAt: ["$department.name", 0] },
+                            {
+                                $arrayElemAt: [
+                                    "$department.name",
+                                    0
+                                ]
+                            },
                             "Unassigned"
                         ]
                     },
                     count: 1
                 }
             },
-            { $sort: { count: -1 } }
+            {
+                $sort: {
+                    count: -1
+                }
+            }
         ]);
 
         const totalEmployees = distribution.reduce(
-            (sum, d) => sum + d.count, 0
+            (sum, d) => sum + d.count,
+            0
         );
 
         const distributionWithPercent = distribution.map((d) => ({
             ...d,
-            percentage: totalEmployees > 0
-                ? Number(((d.count / totalEmployees) * 100).toFixed(1))
-                : 0
+            percentage:
+                totalEmployees > 0
+                    ? Number(
+                          ((d.count / totalEmployees) * 100).toFixed(1)
+                      )
+                    : 0
         }));
 
         return res.status(200).json({
@@ -215,9 +310,11 @@ const getDepartmentDistribution = async (req, res) => {
             totalEmployees,
             distribution: distributionWithPercent
         });
-
     } catch (error) {
-        console.error("Get Department Distribution Error:", error);
+        console.error(
+            "Get Department Distribution Error:",
+            error
+        );
 
         return res.status(500).json({
             message: "Internal server error"
@@ -225,13 +322,16 @@ const getDepartmentDistribution = async (req, res) => {
     }
 };
 
-
-
-
 // ---------- GENERATE REPORT ----------
+
 const generateReport = async (req, res) => {
     try {
-        const { reportType, startDate, endDate, departmentId } = req.body;
+        const {
+            reportType,
+            startDate,
+            endDate,
+            departmentId
+        } = req.body;
 
         const validTypes = [
             "Employee Report",
@@ -256,7 +356,10 @@ const generateReport = async (req, res) => {
         const start = new Date(startDate);
         const end = new Date(endDate);
 
-        if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        if (
+            isNaN(start.getTime()) ||
+            isNaN(end.getTime())
+        ) {
             return res.status(400).json({
                 message: "Invalid startDate or endDate"
             });
@@ -291,9 +394,12 @@ const generateReport = async (req, res) => {
         }
 
         const endInclusive = new Date(end);
-        endInclusive.setUTCDate(endInclusive.getUTCDate() + 1);
 
-        // Build employee filter (used across all report types for department scoping)
+        endInclusive.setUTCDate(
+            endInclusive.getUTCDate() + 1
+        );
+
+        // Build employee filter
         const employeeFilter = {
             isActive: true,
             isDeleted: false
@@ -304,49 +410,86 @@ const generateReport = async (req, res) => {
         }
 
         const employeeIds = departmentId
-            ? (await Employee.find(employeeFilter).select("_id")).map((e) => e._id)
+            ? (
+                  await Employee.find(employeeFilter).select(
+                      "_id"
+                  )
+              ).map((e) => e._id)
             : null;
 
         let summary = {};
 
         // ----- Build summary based on report type -----
-        if (reportType === "Employee Report") {
-            const totalEmployees = await Employee.countDocuments(employeeFilter);
 
-            const activeEmployees = await Employee.countDocuments({
-                ...employeeFilter,
-                status: "Active"
-            });
+        if (reportType === "Employee Report") {
+            const totalEmployees =
+                await Employee.countDocuments(
+                    employeeFilter
+                );
+
+            const activeEmployees =
+                await Employee.countDocuments({
+                    ...employeeFilter,
+                    status: "Active"
+                });
 
             summary = {
                 totalEmployees,
                 activeEmployees
             };
-
         } else if (reportType === "Attendance Report") {
             const attendanceFilter = {
                 isActive: true,
-                date: { $gte: start, $lt: endInclusive }
+                date: {
+                    $gte: start,
+                    $lt: endInclusive
+                }
             };
 
             if (employeeIds) {
-                attendanceFilter.employeeId = { $in: employeeIds };
+                attendanceFilter.employeeId = {
+                    $in: employeeIds
+                };
             }
 
-            const records = await Attendance.find(attendanceFilter);
+            const records =
+                await Attendance.find(attendanceFilter);
 
             const totalWorkingDays = new Set(
-                records.map((r) => r.date.toISOString().split("T")[0])
+                records.map(
+                    (r) =>
+                        r.date
+                            .toISOString()
+                            .split("T")[0]
+                )
             ).size;
 
-            const presentDays = records.filter((r) => r.status === "Present").length;
-            const absentDays = records.filter((r) => r.status === "Absent").length;
-            const halfDays = records.filter((r) => r.status === "Half Day").length;
-            const leaveDays = records.filter((r) => r.status === "Leave").length;
+            const presentDays = records.filter(
+                (r) => r.status === "Present"
+            ).length;
 
-            const attendanceRate = records.length > 0
-                ? Number(((presentDays / records.length) * 100).toFixed(1))
-                : 0;
+            const absentDays = records.filter(
+                (r) => r.status === "Absent"
+            ).length;
+
+            const halfDays = records.filter(
+                (r) => r.status === "Half Day"
+            ).length;
+
+            const leaveDays = records.filter(
+                (r) => r.status === "Leave"
+            ).length;
+
+            const attendanceRate =
+                records.length > 0
+                    ? Number(
+                          (
+                              (presentDays /
+                                  records.length) *
+                              100
+                          ).toFixed(1)
+                      )
+                    : 0;
 
             summary = {
                 totalWorkingDays,
@@ -356,106 +499,200 @@ const generateReport = async (req, res) => {
                 leaveDays,
                 attendanceRate
             };
-
         } else if (reportType === "Leave Report") {
             const leaveFilter = {
                 isActive: true,
-                startDate: { $lt: endInclusive },
-                endDate: { $gte: start }
+                startDate: {
+                    $lt: endInclusive
+                },
+                endDate: {
+                    $gte: start
+                }
             };
 
             if (employeeIds) {
-                leaveFilter.employeeId = { $in: employeeIds };
+                leaveFilter.employeeId = {
+                    $in: employeeIds
+                };
             }
 
-            const leaves = await Leave.find(leaveFilter);
+            const leaves =
+                await Leave.find(leaveFilter);
 
             summary = {
                 totalLeaveRequests: leaves.length,
-                approved: leaves.filter((l) => l.status === "Approved").length,
-                rejected: leaves.filter((l) => l.status === "Rejected").length,
-                pending: leaves.filter((l) => l.status === "Pending").length
+                approved: leaves.filter(
+                    (l) => l.status === "Approved"
+                ).length,
+                rejected: leaves.filter(
+                    (l) => l.status === "Rejected"
+                ).length,
+                pending: leaves.filter(
+                    (l) => l.status === "Pending"
+                ).length
             };
-
         } else if (reportType === "Payroll Report") {
             const payrollFilter = {
                 isActive: true
             };
 
             if (employeeIds) {
-                payrollFilter.employeeId = { $in: employeeIds };
+                payrollFilter.employeeId = {
+                    $in: employeeIds
+                };
             }
 
-            const payrollAgg = await Payroll.aggregate([
-                { $match: payrollFilter },
-                {
-                    $group: {
-                        _id: null,
-                        totalPayrollRecords: { $sum: 1 },
-                        totalPaid: {
-                            $sum: {
-                                $cond: [{ $eq: ["$paymentStatus", "Paid"] }, "$netSalary", 0]
-                            }
-                        },
-                        totalPending: {
-                            $sum: {
-                                $cond: [{ $eq: ["$paymentStatus", "Pending"] }, "$netSalary", 0]
-                            }
-                        },
-                        paidCount: {
-                            $sum: {
-                                $cond: [{ $eq: ["$paymentStatus", "Paid"] }, 1, 0]
-                            }
-                        },
-                        pendingCount: {
-                            $sum: {
-                                $cond: [{ $eq: ["$paymentStatus", "Pending"] }, 1, 0]
+            const payrollAgg =
+                await Payroll.aggregate([
+                    {
+                        $match: payrollFilter
+                    },
+                    {
+                        $group: {
+                            _id: null,
+
+                            totalPayrollRecords: {
+                                $sum: 1
+                            },
+
+                            totalPaid: {
+                                $sum: {
+                                    $cond: [
+                                        {
+                                            $eq: [
+                                                "$paymentStatus",
+                                                "Paid"
+                                            ]
+                                        },
+                                        "$netSalary",
+                                        0
+                                    ]
+                                }
+                            },
+
+                            totalPending: {
+                                $sum: {
+                                    $cond: [
+                                        {
+                                            $eq: [
+                                                "$paymentStatus",
+                                                "Pending"
+                                            ]
+                                        },
+                                        "$netSalary",
+                                        0
+                                    ]
+                                }
+                            },
+
+                            paidCount: {
+                                $sum: {
+                                    $cond: [
+                                        {
+                                            $eq: [
+                                                "$paymentStatus",
+                                                "Paid"
+                                            ]
+                                        },
+                                        1,
+                                        0
+                                    ]
+                                }
+                            },
+
+                            pendingCount: {
+                                $sum: {
+                                    $cond: [
+                                        {
+                                            $eq: [
+                                                "$paymentStatus",
+                                                "Pending"
+                                            ]
+                                        },
+                                        1,
+                                        0
+                                    ]
+                                }
                             }
                         }
                     }
-                }
-            ]);
+                ]);
 
-            summary = payrollAgg.length > 0
-                ? {
-                    totalPayrollRecords: payrollAgg[0].totalPayrollRecords,
-                    totalPaidAmount: payrollAgg[0].totalPaid,
-                    totalPendingAmount: payrollAgg[0].totalPending,
-                    paidCount: payrollAgg[0].paidCount,
-                    pendingCount: payrollAgg[0].pendingCount
-                }
-                : {
-                    totalPayrollRecords: 0,
-                    totalPaidAmount: 0,
-                    totalPendingAmount: 0,
-                    paidCount: 0,
-                    pendingCount: 0
-                };
+            summary =
+                payrollAgg.length > 0
+                    ? {
+                          totalPayrollRecords:
+                              payrollAgg[0]
+                                  .totalPayrollRecords,
 
-        } else if (reportType === "Department Analysis Report") {
-            const distribution = await Employee.aggregate([
-                { $match: { isActive: true, isDeleted: false } },
-                {
-                    $group: {
-                        _id: "$departmentId",
-                        count: { $sum: 1 }
+                          totalPaidAmount:
+                              payrollAgg[0].totalPaid,
+
+                          totalPendingAmount:
+                              payrollAgg[0]
+                                  .totalPending,
+
+                          paidCount:
+                              payrollAgg[0].paidCount,
+
+                          pendingCount:
+                              payrollAgg[0]
+                                  .pendingCount
+                      }
+                    : {
+                          totalPayrollRecords: 0,
+                          totalPaidAmount: 0,
+                          totalPendingAmount: 0,
+                          paidCount: 0,
+                          pendingCount: 0
+                      };
+        } else if (
+            reportType ===
+            "Department Analysis Report"
+        ) {
+            const distribution =
+                await Employee.aggregate([
+                    {
+                        $match: {
+                            isActive: true,
+                            isDeleted: false
+                        }
+                    },
+                    {
+                        $group: {
+                            _id: "$departmentId",
+                            count: {
+                                $sum: 1
+                            }
+                        }
                     }
-                }
-            ]);
+                ]);
 
             summary = {
-                totalDepartments: distribution.length,
-                totalEmployeesAcrossDepartments: distribution.reduce(
-                    (sum, d) => sum + d.count, 0
-                )
+                totalDepartments:
+                    distribution.length,
+
+                totalEmployeesAcrossDepartments:
+                    distribution.reduce(
+                        (sum, d) =>
+                            sum + d.count,
+                        0
+                    )
             };
         }
 
         // Build a readable report name
-        const reportName = `${reportType} - ${start.toLocaleString("default", { month: "long", year: "numeric" })}`;
+        const reportName = `${reportType} - ${start.toLocaleString(
+            "default",
+            {
+                month: "long",
+                year: "numeric"
+            }
+        )}`;
 
         // Get the Admin's email for the PDF
-        const generatedByUser = await User.findById(req.user.userId);
+        const generatedByUser =
+            await User.findById(req.user.userId);
 
         // Generate the actual PDF file
         const filePath = await generateReportPDF({
@@ -463,8 +700,11 @@ const generateReport = async (req, res) => {
             reportType,
             startDate: start,
             endDate: end,
-            departmentName: department ? department.name : null,
-            generatedByEmail: generatedByUser.email,
+            departmentName: department
+                ? department.name
+                : null,
+            generatedByEmail:
+                generatedByUser.email,
             summary
         });
 
@@ -474,7 +714,8 @@ const generateReport = async (req, res) => {
             reportType,
             startDate: start,
             endDate: end,
-            departmentId: departmentId || null,
+            departmentId:
+                departmentId || null,
             generatedBy: req.user.userId,
             filePath,
             summary
@@ -484,9 +725,11 @@ const generateReport = async (req, res) => {
             message: "Report generated successfully",
             report
         });
-
     } catch (error) {
-        console.error("Generate Report Error:", error);
+        console.error(
+            "Generate Report Error:",
+            error
+        );
 
         return res.status(500).json({
             message: "Internal server error"
@@ -494,8 +737,8 @@ const generateReport = async (req, res) => {
     }
 };
 
+// ---------- GET ALL REPORTS ----------
 
-// ---------- GET ALL REPORTS (Generated Reports table) ----------
 const getAllReports = async (req, res) => {
     try {
         const {
@@ -507,9 +750,13 @@ const getAllReports = async (req, res) => {
         const pageNumber = Number(page);
         const limitNumber = Number(limit);
 
-        if (!Number.isInteger(pageNumber) || pageNumber < 1) {
+        if (
+            !Number.isInteger(pageNumber) ||
+            pageNumber < 1
+        ) {
             return res.status(400).json({
-                message: "Page must be a positive integer"
+                message:
+                    "Page must be a positive integer"
             });
         }
 
@@ -519,36 +766,57 @@ const getAllReports = async (req, res) => {
             limitNumber > 100
         ) {
             return res.status(400).json({
-                message: "Limit must be between 1 and 100"
+                message:
+                    "Limit must be between 1 and 100"
             });
         }
 
-        const filter = { isActive: true };
+        const filter = {
+            isActive: true
+        };
 
         if (reportType) {
             filter.reportType = reportType;
         }
 
-        const totalReports = await Report.countDocuments(filter);
+        const totalReports =
+            await Report.countDocuments(filter);
 
         const reports = await Report.find(filter)
-            .populate("generatedBy", "email role")
-            .populate("departmentId", "name")
-            .sort({ createdAt: -1 })
-            .skip((pageNumber - 1) * limitNumber)
+            .populate(
+                "generatedBy",
+                "email role"
+            )
+            .populate(
+                "departmentId",
+                "name"
+            )
+            .sort({
+                createdAt: -1
+            })
+            .skip(
+                (pageNumber - 1) *
+                    limitNumber
+            )
             .limit(limitNumber);
 
         return res.status(200).json({
-            message: "Reports fetched successfully",
+            message:
+                "Reports fetched successfully",
             count: reports.length,
             totalReports,
             currentPage: pageNumber,
-            totalPages: Math.ceil(totalReports / limitNumber),
+            totalPages: Math.ceil(
+                totalReports /
+                    limitNumber
+            ),
             reports
         });
-
     } catch (error) {
-        console.error("Get All Reports Error:", error);
+        console.error(
+            "Get All Reports Error:",
+            error
+        );
 
         return res.status(500).json({
             message: "Internal server error"
@@ -556,24 +824,35 @@ const getAllReports = async (req, res) => {
     }
 };
 
+// ---------- GET REPORT BY ID ----------
 
-// ---------- GET REPORT BY ID (Report Details panel) ----------
 const getReportById = async (req, res) => {
     try {
         const { reportId } = req.params;
 
-        if (!mongoose.Types.ObjectId.isValid(reportId)) {
+        if (
+            !mongoose.Types.ObjectId.isValid(
+                reportId
+            )
+        ) {
             return res.status(400).json({
                 message: "Invalid report ID"
             });
         }
 
-        const report = await Report.findOne({
-            _id: reportId,
-            isActive: true
-        })
-            .populate("generatedBy", "email role")
-            .populate("departmentId", "name");
+        const report =
+            await Report.findOne({
+                _id: reportId,
+                isActive: true
+            })
+                .populate(
+                    "generatedBy",
+                    "email role"
+                )
+                .populate(
+                    "departmentId",
+                    "name"
+                );
 
         if (!report) {
             return res.status(404).json({
@@ -582,12 +861,15 @@ const getReportById = async (req, res) => {
         }
 
         return res.status(200).json({
-            message: "Report fetched successfully",
+            message:
+                "Report fetched successfully",
             report
         });
-
     } catch (error) {
-        console.error("Get Report By Id Error:", error);
+        console.error(
+            "Get Report By Id Error:",
+            error
+        );
 
         return res.status(500).json({
             message: "Internal server error"
@@ -595,22 +877,27 @@ const getReportById = async (req, res) => {
     }
 };
 
-
 // ---------- DOWNLOAD REPORT PDF ----------
+
 const downloadReport = async (req, res) => {
     try {
         const { reportId } = req.params;
 
-        if (!mongoose.Types.ObjectId.isValid(reportId)) {
+        if (
+            !mongoose.Types.ObjectId.isValid(
+                reportId
+            )
+        ) {
             return res.status(400).json({
                 message: "Invalid report ID"
             });
         }
 
-        const report = await Report.findOne({
-            _id: reportId,
-            isActive: true
-        });
+        const report =
+            await Report.findOne({
+                _id: reportId,
+                isActive: true
+            });
 
         if (!report) {
             return res.status(404).json({
@@ -618,18 +905,28 @@ const downloadReport = async (req, res) => {
             });
         }
 
-        const absolutePath = path.join(__dirname, "..", report.filePath);
+        const absolutePath = path.join(
+            __dirname,
+            "..",
+            report.filePath
+        );
 
         if (!fs.existsSync(absolutePath)) {
             return res.status(404).json({
-                message: "Report file not found on server"
+                message:
+                    "Report file not found on server"
             });
         }
 
-        return res.download(absolutePath, `${report.reportName}.pdf`);
-
+        return res.download(
+            absolutePath,
+            `${report.reportName}.pdf`
+        );
     } catch (error) {
-        console.error("Download Report Error:", error);
+        console.error(
+            "Download Report Error:",
+            error
+        );
 
         return res.status(500).json({
             message: "Internal server error"
@@ -637,22 +934,27 @@ const downloadReport = async (req, res) => {
     }
 };
 
-
 // ---------- DELETE REPORT ----------
+
 const deleteReport = async (req, res) => {
     try {
         const { reportId } = req.params;
 
-        if (!mongoose.Types.ObjectId.isValid(reportId)) {
+        if (
+            !mongoose.Types.ObjectId.isValid(
+                reportId
+            )
+        ) {
             return res.status(400).json({
                 message: "Invalid report ID"
             });
         }
 
-        const report = await Report.findOne({
-            _id: reportId,
-            isActive: true
-        });
+        const report =
+            await Report.findOne({
+                _id: reportId,
+                isActive: true
+            });
 
         if (!report) {
             return res.status(404).json({
@@ -665,18 +967,20 @@ const deleteReport = async (req, res) => {
         await report.save();
 
         return res.status(200).json({
-            message: "Report deleted successfully"
+            message:
+                "Report deleted successfully"
         });
-
     } catch (error) {
-        console.error("Delete Report Error:", error);
+        console.error(
+            "Delete Report Error:",
+            error
+        );
 
         return res.status(500).json({
             message: "Internal server error"
         });
     }
 };
-
 
 module.exports = {
     getDashboardSummary,
@@ -688,5 +992,3 @@ module.exports = {
     downloadReport,
     deleteReport
 };
-
-
