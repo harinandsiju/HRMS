@@ -144,6 +144,13 @@ const {
 } = require("../controllers/settingsController");
 
 
+const {
+    getMyLeaveBalances,
+    getEmployeeLeaveBalances,
+    updateEmployeeLeaveBalance
+} = require("../controllers/leave/leaveBalanceController");
+
+
 
 const Employee = require("../models/Employee");
 
@@ -435,6 +442,30 @@ router.delete(
     authenticateUser,
     authorizeAdmin,
     deletePayroll
+);
+
+
+// Employee: View own leave balances
+router.get(
+    "/leave-balance/my-balance",
+    authenticateUser,
+    getMyLeaveBalances
+);
+
+// Admin: View a specific employee's leave balances
+router.get(
+    "/leave-balance/employee/:employeeId",
+    authenticateUser,
+    authorizeAdmin,
+    getEmployeeLeaveBalances
+);
+
+// Admin: Update a specific employee's allowance
+router.put(
+    "/leave-balance/employee/:employeeId",
+    authenticateUser,
+    authorizeAdmin,
+    updateEmployeeLeaveBalance
 );
 
 

@@ -52,6 +52,19 @@ const leaveSchema = new mongoose.Schema(
             default: ""
         },
 
+        // Number of working days deducted upon approval.
+        deductedDays: {
+            type: Number,
+            min: 0,
+            default: 0
+        },
+
+        // Identifies the year against which leave was deducted.
+        balanceYear: {
+            type: Number,
+            default: null
+        },
+
         isActive: {
             type: Boolean,
             default: true

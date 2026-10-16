@@ -1,8 +1,12 @@
 import { useEffect, useState } from "react";
 import api from "../../api/axios";
 
-function MyLeave() {
+function EmployeeLeave() {
     const [leaves, setLeaves] = useState([]);
+    const [leaveBalances, setLeaveBalances] = useState([]);
+    const [balanceLoading, setBalanceLoading] = useState(true);
+    const [balanceError, setBalanceError] = useState("");
+    const [balanceYear, setBalanceYear] = useState(new Date().getFullYear());
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
@@ -79,8 +83,39 @@ function MyLeave() {
         }
     };
 
+    // ==================================================
+    // FETCH MY LEAVE BALANCES
+    // ==================================================
+
+    const fetchMyLeaveBalances = async (year = balanceYear) => {
+        try {
+            setBalanceLoading(true);
+            setBalanceError("");
+
+            const response = await api.get(
+                `/leave-balance/my-balance?year=${year}`
+            );
+
+            setLeaveBalances(
+                Array.isArray(response.data?.balances)
+                    ? response.data.balances
+                    : []
+            );
+        } catch (err) {
+            console.error("Fetch My Leave Balances Error:", err);
+            setBalanceError(
+                err.response?.data?.message ||
+                    "Failed to load your leave balances."
+            );
+            setLeaveBalances([]);
+        } finally {
+            setBalanceLoading(false);
+        }
+    };
+
     useEffect(() => {
         fetchMyLeaves();
+        fetchMyLeaveBalances();
     }, []);
 
     // ==================================================
@@ -617,6 +652,107 @@ function MyLeave() {
                 </button>
 
             </div>
+
+            {/* ==================================================
+                LEAVE BALANCE
+            ================================================== */}
+
+            <section className="bg-white border border-gray-100 rounded-2xl shadow-sm p-5 sm:p-6 mb-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+                    <div>
+                        <h2 className="text-lg font-semibold text-gray-900">
+                            Leave Balance
+                        </h2>
+                        <p className="text-sm text-gray-500 mt-1">
+                            Track your yearly allowance, used days, and remaining leave.
+                        </p>
+                    </div>
+
+                    <label className="flex items-center gap-2 text-sm text-gray-600">
+                        <span>Year</span>
+                        <select
+                            value={balanceYear}
+                            onChange={(e) => {
+                                const year = Number(e.target.value);
+                                setBalanceYear(year);
+                                fetchMyLeaveBalances(year);
+                            }}
+                            className="px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-800 outline-none focus:ring-2 focus:ring-violet-100 focus:border-violet-500"
+                        >
+                            {[new Date().getFullYear() - 1, new Date().getFullYear(), new Date().getFullYear() + 1].map((year) => (
+                                <option key={year} value={year}>{year}</option>
+                            ))}
+                        </select>
+                    </label>
+                </div>
+
+                {balanceLoading ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+                        {[1, 2, 3, 4, 5].map((item) => (
+                            <div key={item} className="h-28 rounded-xl bg-gray-100 animate-pulse" />
+                        ))}
+                    </div>
+                ) : balanceError ? (
+                    <div className="rounded-xl border border-red-200 bg-red-50 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <p className="text-sm text-red-700">{balanceError}</p>
+                        <button
+                            type="button"
+                            onClick={() => fetchMyLeaveBalances()}
+                            className="text-sm font-semibold text-red-700 hover:text-red-900"
+                        >
+                            Retry
+                        </button>
+                    </div>
+                ) : leaveBalances.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center">
+                        <i className="fas fa-calendar-check text-2xl text-gray-400 mb-2" />
+                        <p className="text-sm font-medium text-gray-700">No leave balance records found for {balanceYear}.</p>
+                        <p className="text-xs text-gray-500 mt-1">Please contact your administrator if you think this is incorrect.</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+                        {leaveBalances.map((balance) => {
+                            const total = Number(balance.totalDays) || 0;
+                            const used = Number(balance.usedDays) || 0;
+                            const remaining = Math.max(total - used, 0);
+                            const percentage = total > 0
+                                ? Math.min((used / total) * 100, 100)
+                                : 0;
+
+                            return (
+                                <div
+                                    key={`${balance.leaveType}-${balance.year || balanceYear}`}
+                                    className="rounded-xl border border-gray-100 bg-gray-50 p-4"
+                                >
+                                    <p className="text-sm font-semibold text-gray-800">
+                                        {balance.leaveType || "Leave"}
+                                    </p>
+                                    <p className="text-2xl font-bold text-gray-900 mt-3">
+                                        {remaining}
+                                        <span className="text-sm font-medium text-gray-400"> / {total} days</span>
+                                    </p>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        {used} {used === 1 ? "day" : "days"} used · {remaining} left
+                                    </p>
+                                    <div
+                                        className="h-2 rounded-full bg-gray-200 overflow-hidden mt-3"
+                                        role="progressbar"
+                                        aria-label={`${balance.leaveType} used`}
+                                        aria-valuemin="0"
+                                        aria-valuemax={total}
+                                        aria-valuenow={Math.min(used, total)}
+                                    >
+                                        <div
+                                            className="h-full rounded-full bg-violet-600 transition-all"
+                                            style={{ width: `${percentage}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </section>
 
             {/* ==================================================
                 SUMMARY CARDS
@@ -1421,4 +1557,4 @@ function SummaryCard({
 }
 
 
-export default MyLeave;
+export default EmployeeLeave;
