@@ -24,6 +24,7 @@ const employeeLinks = [
     { to: "/employee/tasks", label: "My Tasks" },
     { to: "/employee/attendance", label: "My Attendance" },
     { to: "/employee/leave", label: "My Leave" },
+    { to: "/employee/payroll", label: "My Payroll" },
     { to: "/employee/documents", label: "My Documents" },
     { to: "/employee/performance", label: "My Performance" },
     { to: "/employee/notifications", label: "Notifications" }
