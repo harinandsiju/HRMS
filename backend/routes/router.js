@@ -62,6 +62,7 @@ const {
     createPayroll,
     getAllPayroll,
     getPayrollByEmployee,
+    getMyPayroll,
     updatePayroll,
     markPayrollAsPaid,
     deletePayroll
@@ -442,6 +443,12 @@ router.delete(
     authenticateUser,
     authorizeAdmin,
     deletePayroll
+);
+
+router.get(
+    "/payroll/my-payroll",
+    authenticateUser,
+    getMyPayroll
 );
 
 

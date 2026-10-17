@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 
 const Payroll = require("../models/Payroll");
 const Employee = require("../models/Employee");
+const User = require("../models/User");
 const logActivity = require("../helpers/activityLogger");
 
 
@@ -363,6 +364,75 @@ const getPayrollByEmployee = async (req, res) => {
 };
 
 
+// Get My Payroll Records
+const getMyPayroll = async (req, res) => {
+    try {
+        // 1. Identify the logged-in user
+        const user = await User.findById(req.user.userId)
+            .select("employeeId");
+
+        if (!user) {
+            return res.status(404).json({
+                message: "User account not found"
+            });
+        }
+
+        // 2. Check whether this user is linked to an employee
+        if (!user.employeeId) {
+            return res.status(403).json({
+                message: "Your account is not linked to an employee"
+            });
+        }
+
+        // 3. Find the linked active employee
+        const employee = await Employee.findOne({
+            _id: user.employeeId,
+            isDeleted: false,
+            isActive: true
+        });
+
+        if (!employee) {
+            return res.status(404).json({
+                message: "Active employee record not found"
+            });
+        }
+
+        // 4. Fetch only this employee's active payroll records
+        const payrolls = await Payroll.find({
+            employeeId: employee._id,
+            isActive: true
+        })
+            .populate({
+                path: "employeeId",
+                select:
+                    "employeeCode firstName lastName email designation departmentId",
+                populate: {
+                    path: "departmentId",
+                    select: "name"
+                }
+            })
+            .sort({
+                year: -1,
+                month: -1
+            });
+
+        // 5. Return the payroll records
+        return res.status(200).json({
+            message: "Your payroll records fetched successfully",
+            count: payrolls.length,
+            payrolls
+        });
+
+    } catch (error) {
+        console.error("Get My Payroll Error:", error);
+
+        return res.status(500).json({
+            message: "Internal server error"
+        });
+    }
+};
+
+
 
 // Update Payroll
 const updatePayroll = async (req, res) => {
@@ -585,6 +655,7 @@ module.exports = {
     createPayroll,
     getAllPayroll,
     getPayrollByEmployee,
+    getMyPayroll,
     updatePayroll,
     markPayrollAsPaid,
     deletePayroll

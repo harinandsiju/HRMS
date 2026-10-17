@@ -35,6 +35,7 @@ import EmployeeLeave from "./pages/employee/EmployeeLeave";
 import EmployeeAttendance from "./pages/employee/EmployeeAttendance";
 import EmployeeDocuments from "./pages/employee/EmployeeDocuments";
 import EmployeePerformance from "./pages/employee/EmployeePerformance";
+import EmployeePayroll from "./pages/employee/EmployeePayroll";
 import EmployeeNotifications from "./pages/employee/EmployeeNotifications";
 
 function App() {
@@ -94,6 +95,7 @@ function App() {
               <Route path="attendance" element={<EmployeeAttendance />} />
               <Route path="documents" element={<EmployeeDocuments />} />
               <Route path="performance" element={<EmployeePerformance />} />
+              <Route path="payroll" element={<EmployeePayroll />} />
               <Route path="notifications" element={<EmployeeNotifications />} />
             </Route>
 
